@@ -65,7 +65,38 @@ public:
         };
     };
 
-    Camera(std::string hostname, int port, std::string xpad_model);
+    struct XpadAcquisitionMode{
+        enum AcquisitionMode{
+            Normal,
+            BurstDDR,
+            BurstSSD
+        };
+    };
+
+    struct XpadOutputSignal{
+        enum OutputSignal{
+            ExposureBusy,
+            ShutterBusy,
+            BusyUpdateOverflow,
+            PixelCounterEnabled,
+            ExternalGate,
+            ExposureReadDone,
+            DataTransfer,
+            RAMReadyImageBusy,
+            XPADToLocalDDR,
+            LocalDDRToPC
+
+        };
+    };
+
+    struct XpadImageFileFormat{
+        enum ImageFileFormat{
+            Ascii,
+            Binary
+        };
+    };
+
+    Camera(std::string hostname, int port, std::string xpad_model, std::string server_type);
     ~Camera();
 
     int init();
@@ -155,12 +186,29 @@ public:
     //! Save local configuration values from detector to file
     int saveConfigLToFile(char *fpath);
 
-    //! Set the exposure parameters
-    //int setExposureParameters(double Texp,double Tovf,unsigned short trigger_mode,unsigned short BusyOutSel);
-    int setExposureParameters(unsigned int NumImage, double Texp,double Tovf,unsigned short trigger_mode,unsigned short BusyOutSel);
+    //! Set flag for geometrical corrections
+    void setGeometricalCorrectionsFlag(unsigned short flag);
+
+    //! Set flag for flat field corrections
+    void setFlatFieldCorrectionsFlag(unsigned short flag);
+
+    //! Set acquisition mode
+    void setAcquisitionMode(unsigned int mode);
+
+    //! Set flag for geometrical corrections
+    void setImageTransferFlag(unsigned short flag);
+
+    //! Set flag for geometrical corrections
+    void setImageFileFormat(unsigned short format);
 
     //! Perform a Calibration over the noise
-    int calibrationOTN(unsigned short OTNCalibration);
+    int calibrationOTN(unsigned short calibrationConfiguration);
+
+    //! Perform a Calibration over the noise with PULSE
+    int calibrationOTNPulse(unsigned short calibrationConfiguration);
+
+    //! Perform a Calibration over the noise
+    int calibrationBEAM(unsigned int time, unsigned int ITHLmax, unsigned short calibrationConfiguration);
 
     //! Reset the detector modules
     int resetModules();

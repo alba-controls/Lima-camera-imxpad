@@ -54,8 +54,11 @@ public:
 	int connectToServer (const std::string hostname, int port);
 	void disconnectFromServer();
 	int initServerDataPort();
-    void getData(void* bptr, int num, unsigned short xpad_format);
-    void getDataExpose(void* bptr, int num, unsigned short xpad_format);
+    //void getData(void* bptr, unsigned short xpad_format);
+    void sendExposeCommand();
+    void getDataExpose(void* bptr, unsigned short xpad_format);
+    void getDataExposeFromFile(void* bptr, unsigned short xpad_format);
+    void getExposeCommandReturn(int &value);
 	std::string getErrorMessage() const;
 	std::vector<std::string> getDebugMessages() const;
     int getChar();

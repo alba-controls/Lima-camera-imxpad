@@ -152,136 +152,152 @@ void XpadClient::sendNoWait(string cmd) {
     sendCmd(cmd);
 }
 
-void XpadClient::getData(void *bptr, int num, unsigned short xpad_format) {
+void XpadClient::sendExposeCommand(){
     DEB_MEMBER_FUNCT();
 
     stringstream cmd;
-    string str;
-    int value;
-    int ret, dataSize;
-    unsigned short *buffer_short;
-    unsigned int *buffer_int;
-
-    if (xpad_format==0)
-        buffer_short = (unsigned short *)bptr;
-
-    else if (xpad_format==1)
-        buffer_int = (unsigned int *)bptr;
-
-    cmd << "ReadImage";
-    sendWait(cmd.str(), str);
-    if (str.compare("SERVER: Ready to send data")==0){
-        cmd.str(std::string());
-
-        cmd << "CLIENT: Ready to receive dataSize";
-        sendWait(cmd.str(), dataSize);
-
-        DEB_TRACE() << "Receiving: "  << dataSize;
-
-        cmd.str(std::string());
-        cmd << dataSize;
-        sendWait(cmd.str(), ret);
-
-        if(ret == 0){
-            sendNoWait("OK");
-
-            string dataString;
-            int dataCount = 0;
-
-            char data[dataSize];
-            for(int i=0; i<dataSize; i++){
-                value = getChar();
-                data[i] = (char)value;
-                if((value != 32) && (value != 13)){
-                    dataString.append(1,data[i]);
-                }
-                else{
-                    //cout << dataString << " ";
-                    //cout << dataCount <<  " ";
-                    if (xpad_format==0){
-                        buffer_short[dataCount] = (unsigned short) atoi(dataString.c_str());
-                    }
-                    else if (xpad_format==1){
-                        buffer_int[dataCount] = (unsigned int) atoi(dataString.c_str());
-                    }
-                    dataString.clear();
-                    dataCount++;
-                }
-            }
-            cout << "Total of data sent: " << dataCount << endl;
-        }
-    }
-
-    else
-        THROW_HW_ERROR(Error) << "Read data from server FAILED";
-}
-
-void XpadClient::getDataExpose(void *bptr, int num, unsigned short xpad_format) {
-    DEB_MEMBER_FUNCT();
-
-    stringstream cmd;
-    string str;
-    int value;
-    int ret, dataSize;
-    unsigned short *buffer_short;
-    unsigned int *buffer_int;
-
-    if (xpad_format==0)
-        buffer_short = (unsigned short *)bptr;
-
-    else if (xpad_format==1)
-        buffer_int = (unsigned int *)bptr;
 
     cmd << "Expose";
-    sendWait(cmd.str(), str);
-    if (str.compare("SERVER: Ready to send data")==0){
-        cmd.str(std::string());
+    sendNoWait(cmd.str());
+}
 
-        cmd << "CLIENT: Ready to receive dataSize";
-        sendWait(cmd.str(), dataSize);
+void XpadClient::getDataExpose(void *bptr, unsigned short xpad_format) {
+    DEB_MEMBER_FUNCT();
 
-        DEB_TRACE() << "Receiving: "  << dataSize;
+    int ret;
+    uint16_t *buffer_short;
+    uint32_t *buffer_int;
+    int32_t *dataBuff;
 
-        cmd.str(std::string());
-        cmd << dataSize;
-        sendWait(cmd.str(), ret);
+    if (xpad_format==0)
+        buffer_short = (uint16_t *)bptr;
+    else
+        buffer_int = (uint32_t *)bptr;
 
-        if(ret == 0){
-            sendNoWait("OK");
+    uint32_t dataSize = 0;
+    uint32_t LineFinalImage = 0;
+    uint32_t ColumnFinalImage = 0;
+    uint32_t bytesReceived = 0;
 
-            string dataString;
-            int dataCount = 0;
+    unsigned char dataChain[3*sizeof(uint32_t)];
 
-            char data[dataSize];
-            for(int i=0; i<dataSize; i++){
-                value = getChar();
-                data[i] = (char)value;
-                if((value != 32) && (value != 13)){
-                    dataString.append(1,data[i]);
-                }
-                else{
-                    //cout << dataString << " ";
-                    //cout << dataCount <<  " ";
-                    if (xpad_format==0){
-                        buffer_short[dataCount] = (unsigned short) atoi(dataString.c_str());
-                    }
-                    else if (xpad_format==1){
-                        buffer_int[dataCount] = (unsigned int) atoi(dataString.c_str());
-                    }
-                    dataString.clear();
-                    dataCount++;
-                }
-            }
-            cout << "Total of data sent: " << dataCount << endl;
-        }
+    while (read(m_skt, dataChain, 3*sizeof(uint32_t)) < 0);
+
+    dataSize = dataChain[3]<<24|dataChain[2]<<16|dataChain[1]<<8|dataChain[0];
+    LineFinalImage = dataChain[7]<<24|dataChain[6]<<16|dataChain[5]<<8|dataChain[4];
+    ColumnFinalImage = dataChain[11]<<24|dataChain[10]<<16|dataChain[9]<<8|dataChain[8];
+
+    DEB_TRACE() << dataSize << " " << LineFinalImage << " " << ColumnFinalImage;
+
+    unsigned char data[dataSize];
+    dataBuff = new int32_t[LineFinalImage*ColumnFinalImage];
+
+    ssize_t bytes;
+    while(bytesReceived < dataSize){
+        while ((bytes = read(m_skt, data+bytesReceived, dataSize-bytesReceived)) < 0);
+        bytesReceived += bytes;
+        cout << "\tReceived " << bytesReceived << " out of " << dataSize << " Bytes" << endl;
     }
 
-    else
+    uint32_t count = 0;
+    int i=0;
+    while (count < dataSize){
+
+        if (xpad_format==0){
+            memcpy (&dataBuff[i], &data[count], sizeof(int32_t) );
+            buffer_short[i] = (uint16_t)(dataBuff[i]);
+        }
+        else{
+            memcpy (&dataBuff[i], &data[count], sizeof(int32_t) );
+            buffer_int[i] = (uint32_t)(dataBuff[i]);
+        }
+        count += sizeof(int32_t);
+        i++;
+    }
+
+    delete[] dataBuff;
+
+    stringstream message;
+    message << "Image Received\n";
+    string tmp = message.str();
+    write(m_skt,(char *)tmp.c_str(),tmp.length());
+
+    if (ret == -1)
         THROW_HW_ERROR(Error) << "Read data from server FAILED";
 }
 
-/*
-void XpadClient::getData(void *bptr, int num, unsigned int xpad_format ) {
+void XpadClient::getDataExposeFromFile(void* bptr, unsigned short xpad_format){
+    DEB_MEMBER_FUNCT();
+
+    int ret;
+    uint16_t *buffer_short;
+    uint32_t *buffer_int;
+    int32_t *dataBuff;
+
+    if (xpad_format==0)
+        buffer_short = (uint16_t *)bptr;
+    else
+        buffer_int = (uint32_t *)bptr;
+
+    uint32_t dataSize = 0;
+    uint32_t LineFinalImage = 0;
+    uint32_t ColumnFinalImage = 0;
+    uint32_t bytesReceived = 0;
+
+    unsigned char dataChain[3*sizeof(uint32_t)];
+
+    while (read(m_skt, dataChain, 3*sizeof(uint32_t)) < 0);
+
+    dataSize = dataChain[3]<<24|dataChain[2]<<16|dataChain[1]<<8|dataChain[0];
+    LineFinalImage = dataChain[7]<<24|dataChain[6]<<16|dataChain[5]<<8|dataChain[4];
+    ColumnFinalImage = dataChain[11]<<24|dataChain[10]<<16|dataChain[9]<<8|dataChain[8];
+
+    DEB_TRACE() << dataSize << " " << LineFinalImage << " " << ColumnFinalImage;
+
+    unsigned char data[dataSize];
+    dataBuff = new int32_t[LineFinalImage*ColumnFinalImage];
+
+    ssize_t bytes;
+    while(bytesReceived < dataSize){
+        while ((bytes = read(m_skt, data+bytesReceived, dataSize-bytesReceived)) < 0);
+        bytesReceived += bytes;
+        cout << "\tReceived " << bytesReceived << " out of " << dataSize << " Bytes" << endl;
+    }
+
+    uint32_t count = 0;
+    int i=0;
+    while (count < dataSize){
+
+        if (xpad_format==0){
+            memcpy (&dataBuff[i], &data[count], sizeof(int32_t) );
+            buffer_short[i] = (uint16_t)(dataBuff[i]);
+        }
+        else{
+            memcpy (&dataBuff[i], &data[count], sizeof(int32_t) );
+            buffer_int[i] = (uint32_t)(dataBuff[i]);
+        }
+        count += sizeof(int32_t);
+        i++;
+    }
+
+    delete[] dataBuff;
+
+    stringstream message;
+    message << "Image Received\n";
+    string tmp = message.str();
+    write(m_skt,(char *)tmp.c_str(),tmp.length());
+
+    if (ret == -1)
+        THROW_HW_ERROR(Error) << "Read data from server FAILED";
+}
+
+void XpadClient::getExposeCommandReturn(int &value){
+    DEB_MEMBER_FUNCT();
+
+    waitForResponse(value);
+}
+
+/*void XpadClient::getData(void *bptr, int num, unsigned int xpad_format ) {
     DEB_MEMBER_FUNCT();
     int rc;
     int dataPort;
@@ -326,8 +342,8 @@ void XpadClient::getData(void *bptr, int num, unsigned int xpad_format ) {
     if (rc < 0) {
         THROW_HW_ERROR(Error) << "Read error from data port " << dataPort;
     }
-}
-*/
+}*/
+
 
 /*
  * Connect to remote server
@@ -650,7 +666,7 @@ int XpadClient::waitForResponse(string& value) {
  * Get the next line from the server
  */
 int XpadClient::nextLine(string *errmsg, int *ivalue, double *dvalue, string *svalue, int *done, int *outoff) {
-    cout << "Inside nextline " << endl;
+    //cout << "Inside nextline " << endl;
     DEB_MEMBER_FUNCT();
     int r;
     char timestr[80], *tp;

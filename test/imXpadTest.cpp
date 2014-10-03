@@ -55,20 +55,29 @@ int main(int argc, char *argv[])
 
     //Xpad configuration properties
     string hostname = "127.0.0.1";
-    string xpad_model = "XPAD_S70C";
+    string server_type = "PCI";
+    string xpad_model = "XPAD_S1400";
 
     hostname = argv[1];
     int port = atoi(argv[2]);
 
     try {
 
-        unsigned short *ret = new unsigned short[8];
+
+        unsigned short *ret = new unsigned short[7*2];
         Camera::XpadStatus status;
-        //int nframes = 1;
 
         //MUST BE SET BEFORE CREATING AN INTERFACE
-        m_camera = new Camera(hostname, port, xpad_model);
-        m_camera->setImageType(Bpp32);
+        m_camera = new Camera(hostname, port, xpad_model, server_type);
+        m_camera->setImageType(Bpp16);
+        m_camera->setLatTime(5000);
+        m_camera->setTrigMode(lima::IntTrig);
+        m_camera->setOutputSignalMode(Camera::XpadOutputSignal::ExposureBusy);
+        m_camera->setGeometricalCorrectionsFlag(1);
+        m_camera->setFlatFieldCorrectionsFlag(1);
+        m_camera->setAcquisitionMode(Camera::XpadAcquisitionMode::BurstSSD);
+        m_camera->setImageTransferFlag(0);
+        m_camera->setImageFileFormat(Camera::XpadImageFileFormat::Binary);
 
         //CREATING AN INTERFACE AND A CONTROL
         m_interface = new Interface(*m_camera);
@@ -77,59 +86,42 @@ int main(int argc, char *argv[])
         if(!m_camera->init()){
 
             //****DIGITAL TEST
-            //if(!m_camera->digitalTest(40,Camera::XpadDigitalTest::Strips)){
-/*
-            int frame_number = 0;
+            //m_camera->digitalTest(40,Camera::XpadDigitalTest::Strips);
 
-            unsigned int val;
-            unsigned int *image = new unsigned int[67200];
+            //****GLOBAL CONFIGURATION FONCTIONS
+            //m_camera->loadConfigG(IMFP,5);
+            //m_camera->loadConfigG(ITHL,32);
+            //m_camera->readConfigG(ITUNE,ret);
 
-            //Command to recover Digital Test image
-            m_camera->readFrame(image, frame_number);
+            //cout << "Global Configuration readed with SUCCESS" << endl << "Register = "\
+            //     << ret[0] << " Values: " << ret[1] << " " << ret[2] << " " << ret[3] << " "\
+            //     << ret[4] << " " << ret[5] << " " << ret[6] << " " << ret[7];
 
-                //Saving Digital Test image to disk
-                mkdir("./Images",S_IRWXU |  S_IRWXG |  S_IRWXO);
-                ofstream file("./Images/DigitalTest.raw", ios::out|ios::binary);
-                if (file.is_open()){
-                    for (int i=0;i<120;i++) {
-                        for (int j=0;j<560;j++){
-                            val = image[i*560+j];
-                            file.write((char *)&val, sizeof(unsigned int));
-                        }
-                    }
-                    file.close();
-                }
-            //}
-*/
-/*            //****GLOBAL CONFIGURATION FONCTIONS
-            m_camera->loadConfigG(IMFP,0);
-            m_camera->loadConfigG(ITHL,0);
-            m_camera->readConfigG(ITUNE,ret);
+            //m_camera->loadDefaultConfigGValues();
+            //m_camera->ITHLIncrease();
+            //m_camera->ITHLDecrease();
 
-            cout << "Global Configuration readed with SUCCESS" << endl << "Register = "\
-                 << ret[0] << " Values: " << ret[1] << " " << ret[2] << " " << ret[3] << " "\
-                 << ret[4] << " " << ret[5] << " " << ret[6] << " " << ret[7];
 
-            m_camera->loadDefaultConfigGValues();
+            //m_camera->saveConfigGToFile("./Calibration/ConfigGlobalTest.cfg");
+            //m_camera->loadConfigGFromFile("./Calibration/ConfigGlobalTest.cfg");
 
-            m_camera->ITHLIncrease();
-            m_camera->ITHLDecrease();
-            m_camera->loadConfigGFromFile("./Calibration/ConfigGlobalSlow.cfg");
 
-            m_camera->saveConfigGToFile("./ConfigGlobalTest.cfg");
+            //****LOCAL CONFIGURATION FONCTIONS            
+            //m_camera->saveConfigLToFile("./Calibration/ConfigLocalTest.cfl");
+            //m_camera->loadConfigLFromFile("./Calibration/ConfigLocalTest.cfl");
+            //m_camera->loadFlatConfigL(30);
 
-            //****LOCAL CONFIGURATION FONCTIONS
-*/          //m_camera->loadFlatConfigL(30);
-            //m_camera->loadConfigLFromFile("./Calibration/ConfigLocalSlow.cfl");
-            //m_camera->saveConfigLToFile("./ConfigLocalTest.clf");
 
-/*
+
             //****CALIBRATION OVER THE NOISE
-            mkdir("./Calibration",S_IRWXU |  S_IRWXG |  S_IRWXO);
-            m_camera->calibrationOTN(Camera::Calibration::Slow);
-            m_camera->saveConfigLToFile("./Calibration/ConfigLocalSlow.cfl");
-            m_camera->saveConfigGToFile("./Calibration/ConfigGlobalSlow.cfg");
-*/
+            //mkdir("./Calibration",S_IRWXU |  S_IRWXG |  S_IRWXO);
+            //m_camera->calibrationOTN(Camera::Calibration::Slow);
+            //m_camera->calibrationOTNPulse(Camera::Calibration::Slow);
+            //m_camera->calibrationBEAM(1000000, 50, Camera::Calibration::Slow);
+            //m_camera->saveConfigLToFile("./Calibration/ConfigLocalSlow.cfl");
+            //m_camera->saveConfigGToFile("./Calibration/ConfigGlobalSlow.cfg");
+
+
 
             CtSaving* saving = m_control->saving();
             saving->setDirectory("./Images");
@@ -140,10 +132,10 @@ int main(int argc, char *argv[])
             //saving->setSavingMode(CtSaving::Manual);
             saving->setOverwritePolicy(CtSaving::Overwrite);
 
-            int nframes = 1;
-            m_camera->setTrigMode(lima::IntTrig);
-            m_control->acquisition()->setAcqExpoTime(1);
+            int nframes = 1000;
+            m_control->acquisition()->setAcqExpoTime(0.001);
             m_control->acquisition()->setAcqNbFrames(nframes);
+
             m_control->prepareAcq();
             m_control->startAcq();
             m_camera->stopAcq();

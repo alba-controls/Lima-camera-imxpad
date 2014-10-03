@@ -35,7 +35,6 @@
 #include "HwBufferMgr.h"
 #include "HwInterface.h"
 #include "imXpadInterface.h"
-#include <ostream>
 #include "Debug.h"
 #include "imXpadClient.h"
 
@@ -63,6 +62,7 @@ public:
             Resetting, ///< The detector is resetting.
             Running ///< The detector is acquiring data.
         };
+
         XpadState state;
         int frame_num; ///< The current frame number, within a group, being acquired, only valid when not {@link #Idle}
         int completed_frames; ///< The number of frames completed, only valid when not {@link #Idle}
@@ -77,14 +77,45 @@ public:
     };
 
     struct Calibration{
-        enum OTN{
+        enum Configuration{
             Slow,
             Medium,
             Fast
         };
     };
 
-    Camera(std::string hostname, int port, std::string xpad_model);
+    struct XpadAcquisitionMode{
+        enum AcquisitionMode{
+            Normal,
+            BurstDDR,
+            BurstSSD
+        };
+    };
+
+    struct XpadOutputSignal{
+        enum OutputSignal{
+            ExposureBusy,
+            ShutterBusy,
+            BusyUpdateOverflow,
+            PixelCounterEnabled,
+            ExternalGate,
+            ExposureReadDone,
+            DataTransfer,
+            RAMReadyImageBusy,
+            XPADToLocalDDR,
+            LocalDDRToPC
+
+        };
+    };
+
+    struct XpadImageFileFormat{
+        enum ImageFileFormat{
+            Ascii,
+            Binary
+        };
+    };
+
+    Camera(std::string hostname, int port, std::string xpad_model, std::string server_type);
     ~Camera();
 
     int init();
@@ -105,13 +136,17 @@ public:
     HwBufferCtrlObj* getBufferCtrlObj();
     void setNbFrames(int nb_frames);
     void getNbFrames(int& nb_frames);
-    void readFrame(void *ptr, int frame_nb);
+    void sendExposeCommand();
     void readFrameExpose(void *ptr, int frame_nb);
+    void readFrameExposeFromFile(void *ptr, int frame_nb);
+    int getDataExposeReturn();
     int getNbHwAcquiredFrames();
 
     //-- Synch control object
     void setTrigMode(TrigMode mode);
     void getTrigMode(TrigMode& mode);
+    void setOutputSignalMode(unsigned short mode);
+    void getOutputSignalMode(unsigned short& mode);
     void setExpTime(double exp_time);
     void getExpTime(double& exp_time);
     void setLatTime(double lat_time);
@@ -168,11 +203,29 @@ public:
     //! Save local configuration values from detector to file
     int saveConfigLToFile(char *fpath);
 
-    //! Set the exposure parameters
-    int setExposureParameters(unsigned int NumImage, double Texp,double Tovf,unsigned short trigger_mode,unsigned short BusyOutSel);
+    //! Set flag for geometrical corrections
+    void setGeometricalCorrectionsFlag(unsigned short flag);
+
+    //! Set flag for flat field corrections
+    void setFlatFieldCorrectionsFlag(unsigned short flag);
+
+    //! Set acquisition mode
+    void setAcquisitionMode(unsigned int mode);
+
+    //! Set flag for geometrical corrections
+    void setImageTransferFlag(unsigned short flag);
+
+    //! Set flag for geometrical corrections
+    void setImageFileFormat(unsigned short format);
 
     //! Perform a Calibration over the noise
-    int calibrationOTN(unsigned short OTNCalibration);
+    int calibrationOTN(unsigned short calibrationConfiguration);
+
+    //! Perform a Calibration over the noise with PULSE
+    int calibrationOTNPulse(unsigned short calibrationConfiguration);
+
+    //! Perform a Calibration over the noise
+    int calibrationBEAM(unsigned int time, unsigned int ITHLmax, unsigned short calibrationConfiguration);
 
     //! Reset the detector modules
     int resetModules();
@@ -183,18 +236,9 @@ public:
 private:
 
     // Xpad specific
+#define PCI                         0
+#define USB                         1
 
-    /*     TYPE OF SYTEM     */
-#define XPAD_S10                    0
-#define XPAD_C10                    1
-#define XPAD_A10                    2
-#define XPAD_S70                    3
-#define XPAD_S70C                   4
-#define XPAD_S140                   5
-#define XPAD_S340                   6
-#define XPAD_S540                   7
-#define XPAD_S540V                  8
-#define XPAD_S1400                  9
 
    /*     GLOBAL REGISTERS     */
 #define AMPTP                       31
@@ -233,14 +277,24 @@ private:
 
     //---------------------------------
     //- XPAD stuff
-    unsigned short	        m_modules_mask;
+    unsigned int	        m_modules_mask;
     unsigned short          m_chip_mask;
     unsigned short          m_xpad_model;
+    unsigned short          m_server_type;
     unsigned short          m_xpad_format;
+
+    unsigned short          m_geometrical_corrections_flag;
+    unsigned short          m_flat_field_corrections_flag;
+    unsigned short          m_acquisition_mode;
+    unsigned short          m_image_transfer_flag;
+    unsigned short          m_image_file_format;
+
     Size                    m_image_size;
     IMG_TYPE                m_pixel_depth;    
     unsigned int            m_xpad_trigger_mode;
+    unsigned int            m_xpad_output_signal_mode;
     unsigned int            m_exp_time_usec;
+    unsigned int            m_lat_time_usec;
     int				        m_module_number;
     int                     m_chip_number;
 

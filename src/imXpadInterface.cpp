@@ -47,8 +47,14 @@ Interface::Interface(Camera& cam) :
 
     m_sync.setNbFrames(1);
     m_sync.setExpTime(1.0);
-    //m_sync.setLatTime(0.0);
+    m_sync.setLatTime(5000.0);
 	m_sync.setTrigMode(IntTrig);
+    /*m_sync.setOutputSignalMode(ExposureBusy);
+    m_sync.setGeometricalCorrectionsFlag(1);
+    m_sync.setFlatFieldCorrectionsFlag(1);
+    m_sync.setAcquisitionMode(Normal);
+    m_sync.setImageTransferFlag(1);
+    m_sync.setImageFileFormat(Binary);*/
 
     Size image_size;
     m_det_info.getMaxImageSize(image_size);
